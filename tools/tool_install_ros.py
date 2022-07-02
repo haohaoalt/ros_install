@@ -59,7 +59,14 @@ class RosVersions:
             PrintUtils.print_warn("小鱼，黄黄的提示：您安装的是ROS1，可以打开一个新的终端输入roscore测试！")
         elif version=="ROS2":
             PrintUtils.print_warn("小鱼：黄黄的提示：您安装的是ROS2,ROS2是没有roscore的，请打开新终端输入ros2测试！小鱼制作了ROS2课程，关注公众号《鱼香ROS》即可获取~")
-    
+
+    @staticmethod
+    def get_desktop_version(name):
+        version = RosVersions.get_version(name).version
+        if version=="ROS1":
+            return "ros-{}-desktop-full".format(name)
+        elif version=="ROS2":
+            return "ros-{}-desktop".format(name)
 
 ros_mirror_dic = {
     "tsinghua":{"ROS1":"http://mirrors.tuna.tsinghua.edu.cn/ros/ubuntu/","ROS2":"http://mirrors.tuna.tsinghua.edu.cn/ros2/ubuntu/"},
@@ -122,12 +129,12 @@ class Tool(BaseTool):
         self.autor = '小鱼'
 
 
-    def get_mirror_by_code(self,code,arch='amd64'):
+    def get_mirror_by_code(self,code,arch='amd64',first_choose="tsinghua"):
         """
         获取镜像通过系统版本号
         """
-        ros1_choose_queue = ["tsinghua","huawei","packages.ros"]
-        ros2_choose_queue = ["tsinghua","huawei","packages.ros"]
+        ros1_choose_queue = [first_choose,"tsinghua","huawei","packages.ros"]
+        ros2_choose_queue = [first_choose,"tsinghua","huawei","packages.ros"]
         
         # armhf架构，优先使用官方源
         if arch=='armhf': ros2_choose_queue =["packages.ros","tsinghua","huawei"]
@@ -173,7 +180,8 @@ class Tool(BaseTool):
         PrintUtils.print_warn("=========接下来这一步很重要，如果不知道怎么选请选择1========")
         code,result = ChooseTask(dic, "首次安装一定要换源并清理三方源，换源!!!系统默认国外源容易失败!!").run()
         if code==1: 
-            run_tool_file('tools.tool_config_system_source')
+            tool = run_tool_file('tools.tool_config_system_source',autorun=False)
+            tool.change_sys_source()
 
 
     def add_source(self):
@@ -183,7 +191,8 @@ class Tool(BaseTool):
 
         arch = AptUtils.getArch()
         if arch==None: return False
-        #add source 
+
+        #add source 1
         mirrors = self.get_mirror_by_code(osversion.get_codename(),arch=arch)
         PrintUtils.print_info("根据您的系统，为您推荐安装源为{}".format(mirrors))
         source_data = ''
@@ -191,8 +200,31 @@ class Tool(BaseTool):
             source_data += 'deb [arch={}]  {} {} main\n'.format(arch,mirror,osversion.get_codename())
         FileUtils.delete('/etc/apt/sources.list.d/ros-fish.list')
         FileUtils.new('/etc/apt/sources.list.d/',"ros-fish.list",source_data)
-        # update
-        if not AptUtils.checkapt(): PrintUtils.print_error("换源后更新失败，请联系小鱼处理!") 
+        if  AptUtils.checkapt(): return
+        
+        #add source2 
+        PrintUtils.print_warn("换源后更新失败，尝试更换ROS2源为华为源！") 
+        mirrors = self.get_mirror_by_code(osversion.get_codename(),arch=arch,first_choose="huawei")
+        PrintUtils.print_info("根据您的系统，为您推荐安装源为{}".format(mirrors))
+        source_data = ''
+        for mirror in mirrors:
+            source_data += 'deb [arch={}]  {} {} main\n'.format(arch,mirror,osversion.get_codename())
+        FileUtils.delete('/etc/apt/sources.list.d/ros-fish.list')
+        FileUtils.new('/etc/apt/sources.list.d/',"ros-fish.list",source_data)
+        if  AptUtils.checkapt(): return
+
+        #add source2 
+        PrintUtils.print_warn("换源后更新失败，尝试更换ROS2源为ROS2官方源！") 
+        mirrors = self.get_mirror_by_code(osversion.get_codename(),arch=arch,first_choose="packages.ros")
+        PrintUtils.print_info("根据您的系统，为您推荐安装源为{}".format(mirrors))
+        source_data = ''
+        for mirror in mirrors:
+            source_data += 'deb [arch={}]  {} {} main\n'.format(arch,mirror,osversion.get_codename())
+        FileUtils.delete('/etc/apt/sources.list.d/ros-fish.list')
+        FileUtils.new('/etc/apt/sources.list.d/',"ros-fish.list",source_data)
+        if  AptUtils.checkapt(): PrintUtils.print_error("换源后更新失败，请及时联系小鱼处理！") 
+
+
 
 
     def support_install(self):
@@ -225,9 +257,8 @@ class Tool(BaseTool):
 
         code,rosname = ChooseTask(ros_name.keys(),"请选择你要安装的ROS版本名称(请注意ROS1和ROS2区别):",True).run()
         if code==0: 
-            print("你选择退出。。。。")
+            PrintUtils.print_error("你选择退出。。。。")
             return
-        
         version_dic = {1:rosname+"桌面版",2:rosname+"基础版(小)"}
         code,name = ChooseTask(version_dic,"请选择安装的具体版本(如果不知道怎么选,请选1桌面版):",False).run()
         
@@ -236,6 +267,7 @@ class Tool(BaseTool):
             return
         
         install_tool = 'aptitude'
+        install_tool_apt = 'apt'
         if osversion.get_version() == "16.04":
             install_tool = 'apt'
 
@@ -245,18 +277,37 @@ class Tool(BaseTool):
             AptUtils.install_pkg('aptitude')
             AptUtils.install_pkg('aptitude')
 
+        # 先尝试使用apt 安装，之后再使用aptitude。
         if code==2:
-            cmd_result = CmdTask("sudo {} install  {} -y".format(install_tool,dic_base[install_version]),300,os_command=True).run()
-            cmd_result = CmdTask("sudo {} install   {} -y".format(install_tool,dic_base[install_version]),300,os_command=False).run()
+            # 第一次尝试
+            cmd_result = CmdTask("sudo {} install  {} -y".format(install_tool_apt,dic_base[install_version]),300,os_command=True).run()
+            cmd_result = CmdTask("sudo {} install  {} -y".format(install_tool_apt,dic_base[install_version]),300,os_command=False).run()
+            if FileUtils.check_result(cmd_result,['未满足的依赖关系','unmet dependencies']):
+                # 尝试使用aptitude解决依赖问题
+                PrintUtils.print_warn("============================================================")
+                PrintUtils.print_delay("请注意我，检测你在安装过程中出现依赖问题，请在稍后输入n,再选择y,即可解决")
+                import time
+                input("确认了解情况，请输入回车继续安装")
+                cmd_result = CmdTask("sudo {} install   {} ".format(install_tool,install_version),300,os_command=True).run()
+                cmd_result = CmdTask("sudo {} install   {} -y".format(install_tool,dic_base[install_version]),300,os_command=False).run()
+        
         elif code==1:
-            cmd_result = CmdTask("sudo {} install   ros-{}-desktop -y".format(install_tool,install_version),300,os_command=True).run()
-            cmd_result = CmdTask("sudo {} install   ros-{}-desktop -y".format(install_tool,install_version),300,os_command=False).run()
+            cmd_result = CmdTask("sudo {} install   {} -y".format(install_tool_apt,RosVersions.get_desktop_version(install_version)),300,os_command=True).run()
+            cmd_result = CmdTask("sudo {} install   {} -y".format(install_tool_apt,RosVersions.get_desktop_version(install_version)),300,os_command=False).run()
+            if FileUtils.check_result(cmd_result,['未满足的依赖关系','unmet dependencies']):
+                # 尝试使用aptitude解决依赖问题
+                PrintUtils.print_warn("============================================================")
+                PrintUtils.print_delay("请注意我，检测你在安装过程中出现依赖问题，请在稍后输入n,再选择y,即可解决")
+                import time
+                input("确认了解情况，请输入回车继续安装")
+                cmd_result = CmdTask("sudo {} install   {}".format(install_tool,RosVersions.get_desktop_version(install_version)),300,os_command=True).run()
+                cmd_result = CmdTask("sudo {} install   {} -y".format(install_tool,RosVersions.get_desktop_version(install_version)),300,os_command=False).run()
 
         # apt broken error
         if cmd_result[0]!=0:
             if FileUtils.check_result(cmd_result[1]+cmd_result[2],['apt --fix-broken install -y']):
                 if code==2: cmd_result = CmdTask("sudo {} install   {} -y".formatinstall_tool,(dic_base[rosname]),300,os_command=False).run()
-                elif code==1: cmd_result = CmdTask("sudo {} install   ros-{}-desktop -y".format(install_tool,rosname),300,os_command=False).run()
+                elif code==1: cmd_result = CmdTask("sudo {} install   {} -y".format(install_tool,rosname),300,os_command=False).run()
 
         # 安装额外的依赖
         RosVersions.install_depend(install_version)
