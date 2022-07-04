@@ -1,4 +1,4 @@
-# 一键安装相关工具
+# 一键安装
 
 > ### 想要的工具可以在[心愿清单](https://github.com/fishros/install/issues/2)中提出
 
