@@ -72,19 +72,20 @@ ros_mirror_dic = {
     "tsinghua":{"ROS1":"http://mirrors.tuna.tsinghua.edu.cn/ros/ubuntu/","ROS2":"http://mirrors.tuna.tsinghua.edu.cn/ros2/ubuntu/"},
     "huawei":{"ROS1":"https://repo.huaweicloud.com/ros/ubuntu/","ROS2":"https://repo.huaweicloud.com/ros2/ubuntu/"},
     "packages.ros":{"ROS1":"http://packages.ros.org/ros/ubuntu/","ROS2":"http://packages.ros.org/ros2/ubuntu/"},
+    "https.packages.ros":{"ROS1":"https://packages.ros.org/ros/ubuntu/","ROS2":"https://packages.ros.org/ros2/ubuntu/"},
     "repo-ros2":{"ROS2":"http://repo.ros2.org/ubuntu/"}
 }
 
 
 ros_dist_dic = {
     'artful':{"packages.ros"},
-    'bionic':{"tsinghua","huawei","packages.ros"},
+    'bionic':{"tsinghua","huawei","packages.ros","https.packages.ros"},
     'buster':{"packages.ros"},
     'cosmic':{"packages.ros"},
     'disco':{"packages.ros"},
     'eoan':{"packages.ros"},
-    'focal':{"tsinghua","huawei","packages.ros"},
-    'jessie':{"tsinghua","huawei","packages.ros"},
+    'focal':{"tsinghua","huawei","packages.ros","https.packages.ros"},
+    'jessie':{"tsinghua","huawei","packages.ros","https.packages.ros"},
     'lucid':{"packages.ros"},
     'maverick':{"packages.ros"},
     'natty':{"packages.ros"},
@@ -93,31 +94,31 @@ ros_dist_dic = {
     'quantal':{"packages.ros"},
     'raring':{"packages.ros"},
     'saucy':{"packages.ros"},
-    'stretch':{"tsinghua","huawei","packages.ros"},
-    'trusty':{"tsinghua","huawei","packages.ros"},
+    'stretch':{"tsinghua","huawei","packages.ros","https.packages.ros"},
+    'trusty':{"tsinghua","huawei","packages.ros","https.packages.ros"},
     'utopic':{"packages.ros"},
     'vivid':{"packages.ros"},
     'wheezy':{"packages.ros"},
     'wily':{"packages.ros"},
-    'xenial':{"tsinghua","huawei","packages.ros"},
+    'xenial':{"tsinghua","huawei","packages.ros","https.packages.ros"},
     'yakkety':{"packages.ros"},
     'zesty':{"packages.ros"},
 }
 
 
 ros2_dist_dic = {
-    'bionic':{"tsinghua","huawei","packages.ros"},
-    'bullseye':{"tsinghua","huawei","packages.ros"},
+    'bionic':{"tsinghua","huawei","packages.ros","https.packages.ros"},
+    'bullseye':{"tsinghua","huawei","packages.ros","https.packages.ros"},
     'buster':{"packages.ros"},
-    'cosmic':{"tsinghua","huawei","packages.ros"},
-    'disco':{"tsinghua","huawei","packages.ros"},
-    'eoan':{"tsinghua","huawei","packages.ros"},
-    'focal':{"tsinghua","huawei","packages.ros"},
+    'cosmic':{"tsinghua","huawei","packages.ros","https.packages.ros"},
+    'disco':{"tsinghua","huawei","packages.ros","https.packages.ros"},
+    'eoan':{"tsinghua","huawei","packages.ros","https.packages.ros"},
+    'focal':{"tsinghua","huawei","packages.ros","https.packages.ros"},
     'jessie':{"tsinghua","huawei"},
-    'jammy':{"tsinghua","huawei","packages.ros"},
-    'stretch':{"tsinghua","huawei","packages.ros"},
+    'jammy':{"tsinghua","huawei","packages.ros","https.packages.ros"},
+    'stretch':{"tsinghua","huawei","packages.ros","https.packages.ros"},
     'trusty':{"tsinghua","huawei"},
-    'xenial':{"tsinghua","huawei","packages.ros"},
+    'xenial':{"tsinghua","huawei","packages.ros","https.packages.ros"},
 }
 
 
@@ -152,8 +153,8 @@ class Tool(BaseTool):
                 if item in ros2_dist_dic[code]:
                     mirror.append(ros_mirror_dic[item]['ROS2'])
                     break
-        if code in ['focal']:
-            mirror.append(ros_mirror_dic['packages.ros']['ROS2'])
+        # if code in ['focal']:
+        #     mirror.append(ros_mirror_dic['packages.ros']['ROS2'])
         return mirror
 
 
@@ -200,10 +201,12 @@ class Tool(BaseTool):
             source_data += 'deb [arch={}]  {} {} main\n'.format(arch,mirror,osversion.get_codename())
         FileUtils.delete('/etc/apt/sources.list.d/ros-fish.list')
         FileUtils.new('/etc/apt/sources.list.d/',"ros-fish.list",source_data)
-        if  AptUtils.checkapt(): return
+        if  AptUtils.checkapt(): 
+            PrintUtils.print_success("恭喜，成功添加ROS源，接下来可以使用apt安装ROS或者使用[1]一键安装ROS安装！") 
+            return
         
         #add source2 
-        PrintUtils.print_warn("换源后更新失败，尝试更换ROS2源为华为源！") 
+        PrintUtils.print_warn("换源后更新失败，第二次开始切换源，尝试更换ROS2源为华为源！") 
         mirrors = self.get_mirror_by_code(osversion.get_codename(),arch=arch,first_choose="huawei")
         PrintUtils.print_info("根据您的系统，为您推荐安装源为{}".format(mirrors))
         source_data = ''
@@ -211,10 +214,12 @@ class Tool(BaseTool):
             source_data += 'deb [arch={}]  {} {} main\n'.format(arch,mirror,osversion.get_codename())
         FileUtils.delete('/etc/apt/sources.list.d/ros-fish.list')
         FileUtils.new('/etc/apt/sources.list.d/',"ros-fish.list",source_data)
-        if  AptUtils.checkapt(): return
+        if  AptUtils.checkapt(): 
+            PrintUtils.print_success("恭喜，成功添加ROS源，接下来可以使用apt安装ROS或者使用[1]一键安装ROS安装！") 
+            return
 
         #add source2 
-        PrintUtils.print_warn("换源后更新失败，尝试更换ROS2源为ROS2官方源！") 
+        PrintUtils.print_warn("换源后更新失败，第三次开始切换源，尝试更换ROS2源为ROS2官方源！") 
         mirrors = self.get_mirror_by_code(osversion.get_codename(),arch=arch,first_choose="packages.ros")
         PrintUtils.print_info("根据您的系统，为您推荐安装源为{}".format(mirrors))
         source_data = ''
@@ -222,9 +227,24 @@ class Tool(BaseTool):
             source_data += 'deb [arch={}]  {} {} main\n'.format(arch,mirror,osversion.get_codename())
         FileUtils.delete('/etc/apt/sources.list.d/ros-fish.list')
         FileUtils.new('/etc/apt/sources.list.d/',"ros-fish.list",source_data)
-        if  not AptUtils.checkapt(): PrintUtils.print_error("换源后更新失败，请及时联系小鱼处理！") 
-        if  AptUtils.checkapt(): PrintUtils.print_error("恭喜，成功添加ROS源，接下来可以使用apt安装ROS或者使用[1]一键安装ROS安装！") 
+        if  AptUtils.checkapt(): 
+            PrintUtils.print_success("恭喜，成功添加ROS源，接下来可以使用apt安装ROS或者使用[1]一键安装ROS安装！") 
+            return
 
+        PrintUtils.print_warn("换源后更新失败，第四次开始切换源，尝试使用https-ROS2官方源～！") 
+        mirrors = self.get_mirror_by_code(osversion.get_codename(),arch=arch,first_choose="https.packages.ros")
+        PrintUtils.print_info("根据您的系统，为您推荐安装源为{}".format(mirrors))
+        source_data = ''
+        for mirror in mirrors:
+            source_data += 'deb [arch={}]  {} {} main\n'.format(arch,mirror,osversion.get_codename())
+        FileUtils.delete('/etc/apt/sources.list.d/ros-fish.list')
+        FileUtils.new('/etc/apt/sources.list.d/',"ros-fish.list",source_data)
+        if  AptUtils.checkapt(): 
+            PrintUtils.print_success("恭喜，成功添加ROS源，接下来可以使用apt安装ROS或者使用[1]一键安装ROS安装！") 
+            return
+
+        # echo >>/etc/apt/apt.conf.d/99verify-peer.conf "Acquire { https::Verify-Peer false }"
+        if  not AptUtils.checkapt(): PrintUtils.print_error("四次换源后都失败了，请及时联系小鱼获取解决方案并处理！") 
 
 
 
@@ -283,7 +303,7 @@ class Tool(BaseTool):
             # 第一次尝试
             cmd_result = CmdTask("sudo {} install  {} -y".format(install_tool_apt,dic_base[install_version]),300,os_command=True).run()
             cmd_result = CmdTask("sudo {} install  {} -y".format(install_tool_apt,dic_base[install_version]),300,os_command=False).run()
-            if FileUtils.check_result(cmd_result,['未满足的依赖关系','unmet dependencies']):
+            if FileUtils.check_result(cmd_result,['未满足的依赖关系','unmet dependencies','but it is not installable']):
                 # 尝试使用aptitude解决依赖问题
                 PrintUtils.print_warn("============================================================")
                 PrintUtils.print_delay("请注意我，检测你在安装过程中出现依赖问题，请在稍后输入n,再选择y,即可解决")
@@ -295,7 +315,7 @@ class Tool(BaseTool):
         elif code==1:
             cmd_result = CmdTask("sudo {} install   {} -y".format(install_tool_apt,RosVersions.get_desktop_version(install_version)),300,os_command=True).run()
             cmd_result = CmdTask("sudo {} install   {} -y".format(install_tool_apt,RosVersions.get_desktop_version(install_version)),300,os_command=False).run()
-            if FileUtils.check_result(cmd_result,['未满足的依赖关系','unmet dependencies']):
+            if FileUtils.check_result(cmd_result,['未满足的依赖关系','unmet dependencies','but it is not installable']):
                 # 尝试使用aptitude解决依赖问题
                 PrintUtils.print_warn("============================================================")
                 PrintUtils.print_delay("请注意我，检测你在安装过程中出现依赖问题，请在稍后输入n,再选择y,即可解决")

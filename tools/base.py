@@ -1116,10 +1116,16 @@ class FileUtils():
 class AptUtils():
     @staticmethod
     def checkapt():
-        apt_command = CmdTask('sudo apt update',100)
-        result = apt_command.run()
+        result = CmdTask('sudo apt update',100).run()
         if result[0]!=0:
-            PrintUtils.print_error("你的系统当前apt存在问题，请先使用一键换源处理...若无法处理，请将下列错误信息告知小鱼...,{}".format(result[2]))
+            if FileUtils.check_result(result,['certificate','证书']):
+                PrintUtils.print_warn("检测到发生证书校验错误{}，自动取消https校验，如有需要请手动删除：rm /etc/apt/apt.conf.d/99verify-peer.conf".format(result[2]))
+                CmdTask('touch /etc/apt/apt.conf.d/99verify-peer.conf').run()
+                CmdTask('echo  "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-peer.conf').run()
+                result = CmdTask('sudo apt update',100).run()
+                
+        if result[0]!=0:
+            PrintUtils.print_warn("当前apt存在问题，推荐使用一键换源处理...若无法处理，请将下列错误信息告知小鱼...,{}".format(result[2]))
             return False
         return True
 
@@ -1165,11 +1171,11 @@ class AptUtils():
         result = AptUtils.install_pkg(name)
         if result:
             # 自动同意安装一次
+            AptUtils.install_pkg('aptitude')
             if FileUtils.check_result(result,['未满足的依赖关系','unmet dependencies']):
                 result = AptUtils.install_pkg(name,apt_tool="aptitude", os_command = False, auto_yes=True)
             # 还不行让用户手动安装
             while FileUtils.check_result(result,['未满足的依赖关系','unmet dependencies']):
-                AptUtils.install_pkg('aptitude')
                 # 尝试使用aptitude解决依赖问题
                 PrintUtils.print_warn("============================================================")
                 PrintUtils.print_delay("请注意我，检测你在安装过程中出现依赖问题，请在稍后选择解决方案（第一个解决方案不一定可以解决问题，如再遇到可以采用下一个解决方案）,即可解决")
